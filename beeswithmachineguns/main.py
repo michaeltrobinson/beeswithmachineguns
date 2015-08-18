@@ -60,7 +60,7 @@ commands:
                         help="The number of servers to start (default: 5).")
     up_group.add_option('-g', '--group', metavar="GROUP", nargs=1,
                         action='store', dest='group', type='string', default='default',
-                        help="The security group(s) to run the instances under (default: default).")
+                        help="The security group(s) ID (not name) to run the instances under (default: default).")
     up_group.add_option('-z', '--zone',  metavar="ZONE",  nargs=1,
                         action='store', dest='zone', type='string', default='us-east-1d',
                         help="The availability zone to start the instances in (default: us-east-1d).")
