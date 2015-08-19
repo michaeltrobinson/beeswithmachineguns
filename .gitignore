@@ -6,3 +6,6 @@ build
 MANIFEST
 dist
 env
+/curl-format.txt
+/ab-out*.txt
+
