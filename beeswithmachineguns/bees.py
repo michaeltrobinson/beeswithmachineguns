@@ -171,6 +171,7 @@ def up(count, group, zone, image_id, instance_type, username, key_name, subnet, 
     print 'Waiting for bees to load their machine guns...'
 
     instance_ids = instance_ids or []
+    instance_names = []
 
     for instance in filter(lambda i: i.state == 'pending', instances):
         instance.update()
@@ -180,10 +181,38 @@ def up(count, group, zone, image_id, instance_type, username, key_name, subnet, 
             instance.update()
 
         instance_ids.append(instance.id)
+        instance_name = instance.private_dns_name if instance.public_dns_name == "" else instance.public_dns_name
+        instance_names.append(instance_name)
 
-        print 'Bee %s is ready for the attack.' % instance.id
+        print 'Bee %s @ %s is ready for the attack.' % (instance.id, instance_name)
 
     ec2_connection.create_tags(instance_ids, { "Name": "a bee!" })
+
+    print 'Sleeping 120 seconds to give the bees time to wake up'
+    time.sleep(120)
+
+    # Install apache2-utils
+    for instance_name in instance_names:
+        try:
+            print 'Prepping %s' % instance_name
+            client = paramiko.SSHClient()
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+            pem_path = key_name and _get_pem_path(key_name) or None
+            if not os.path.isfile(pem_path):
+                client.load_system_host_keys()
+                client.connect(instance_name, username=username)
+            else:
+                client.connect(
+                    instance_name,
+                    username=username,
+                    key_filename=pem_path)
+
+            stdin, stdout, stderr = client.exec_command("sudo apt-get update && sudo apt-get -y install apache2-utils")
+            print stdout.read()
+        except socket.error, e:
+            print str(e)
+            return e
 
     _write_server_list(username, key_name, zone, instances)
 
@@ -316,6 +345,14 @@ def _attack(params):
         response = {}
 
         ab_results = stdout.read()
+        with open('ab-out-%i.txt' % params['i'], 'w') as f:
+            f.write("<<< BEGIN STDOUT >>>")
+            f.write(ab_results)
+            f.write("<< END STDOUT >>>")
+            f.write("<<< BEGIN STDERR >>>")
+            f.write(stderr.read())
+            f.write("<< END STDERR >>>")
+
         ms_per_request_search = re.search('Time\ per\ request:\s+([0-9.]+)\ \[ms\]\ \(mean\)', ab_results)
 
         if not ms_per_request_search:
@@ -602,7 +639,7 @@ def attack(url, n, c, **options):
             'basic_auth': options.get('basic_auth')
         })
 
-    print 'Stinging URL so it will be cached for the attack.'
+    '''print 'Stinging URL so it will be cached for the attack.'
 
     request = urllib2.Request(url)
     # Need to revisit to support all http verbs.
@@ -636,7 +673,7 @@ def attack(url, n, c, **options):
     else:
         response = urllib2.urlopen(request)
 
-    response.read()
+    response.read()'''
 
     print 'Organizing the swarm.'
     # Spin up processes for connecting to EC2 instances
